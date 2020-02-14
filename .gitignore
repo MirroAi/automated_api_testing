@@ -2,3 +2,4 @@
 /venv/
 *.xlsx
 api_information.py
+/__pycache__/
