@@ -20,11 +20,11 @@ class HttpRequests(object):
         if method == 'GET':
             response = self.session.get(url, params=params, headers=headers, **kwargs)
         elif method == 'POST':
-            response = self.session.post(url, json=json, params=params, headers=headers, **kwargs)
+            response = self.session.post(url, params=params, json=json, headers=headers, **kwargs)
         elif method == 'PUT':
-            response = self.session.put(url, json=json, headers=headers, **kwargs)
+            response = self.session.put(url, params=params, json=json, headers=headers, **kwargs)
         elif method == 'DELETE':
-            response = self.session.delete(url, json=json, headers=headers, **kwargs)
+            response = self.session.delete(url, params=params, json=json, headers=headers, **kwargs)
         else:
             raise ValueError('request method: %s is not support' % method)
 
