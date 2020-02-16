@@ -84,12 +84,25 @@ from api_information import api_info, main_url, tokens
 
 
 # 获取get请求
-def get_test_apis():
-    test_apis = []
-    for i in range(api_info.__len__()):
-        if api_info[i + 1]['api_method'] == 'GET':
-            api_info[i + 1]['api_headers']['Authorization'] = tokens['token']
-            test_apis.append(api_info[i + 1])
-    return test_apis
+# def get_test_apis():
+#     test_apis = []
+#     for i in range(api_info.__len__()):
+#         if api_info[i + 1]['api_method'] == 'GET':
+#             api_info[i + 1]['api_headers']['Authorization'] = tokens['token']
+#             test_apis.append(api_info[i + 1])
+#     return test_apis
 
 
+import random
+
+recipient_names = ['你', '好', '7', '世', '界', '一', 'er']
+
+
+def get_random_recipients():
+    s = ''
+    for i in range(3):
+        s += recipient_names[random.randint(0, len(recipient_names)-1)]
+    return  s
+
+
+# print(get_random_recipients())
