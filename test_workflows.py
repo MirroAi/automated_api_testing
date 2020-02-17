@@ -20,6 +20,8 @@ bookshelf_total = 0
 bookshelf_user_old_signature = ''
 new_signature = get_random_recipients()  # new_signature = '' 空字符串，即可以运行出bug
 
+book_list_info = {}  # 最后格式如 {0:{'id': 'list_id', 'book_list_title': 'title'}, 1: ... }
+
 
 def send_requests(method, url, params=None, json=None, headers=None, **kwargs):
     test_session = HttpRequests()
@@ -286,3 +288,69 @@ class TestModifyBookshelfUserProfileSignature:
         assert r_json['code'] == 0
         assert r_json['data']['signature'] != bookshelf_user_old_signature or r_json['data']['signature'] == new_signature
 
+
+class TestGetBooksAndConfigurationOfEveryBookList:
+    """
+    测试获取每个书单中的图书
+    """
+
+    @pytest.mark.run(order=1)
+    def test_get_all_book_list_ids(self):
+        """
+        获取全部书单列表
+        """
+        global book_list_info
+        api = api_info[17]
+        # 获取全部普通书单id与书单title
+        api['api_headers']['Authorization'] = tokens['token']
+        r1 = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
+        assert r1.status_code == 200
+        r1_json = json.loads(r1.text)
+        assert r1_json['code'] == 0
+        for i in range(len(r1_json['data']['items'])):
+            book_list_info[i] = {'id': r1_json['data']['items'][i]['id'], 'book_list_title': r1_json['data']['items'][i]['title']}
+        # print(book_list_info)
+
+        # 获取全部活动书单id与书单title
+        api['api_params']['type'] = 1
+        r2 = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
+        assert r2.status_code == 200
+        r2_json = json.loads(r2.text)
+        assert r2_json['code'] == 0
+        for i in range(len(r2_json['data']['items'])):
+            book_list_info[i + len(r1_json['data']['items'])] = {'id': r2_json['data']['items'][i]['id'], 'book_list_title': r2_json['data']['items'][i]['title']}
+        # print(book_list_info)
+
+    @pytest.mark.run(order=2)
+    def test_get_books_of_book_list(self):
+        """
+        测试能否获取每个书单的书籍列表（书单中书籍数量应>0）
+        """
+        api = api_info[26]
+        api['api_headers']['Authorization'] = tokens['token']
+        for i in range(book_list_info.__len__()):
+            api['api_params']['id'] = book_list_info[i]['id']
+            r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
+            # print('book list id is: ' + str(book_list_info[i]['id']))
+            assert r.status_code == 200
+            r_json = json.loads(r.text)
+            assert r_json['code'] == 0
+            if api['api_params']['id'] not in (57, 55):  # 这两个书单未设置内容
+                assert r_json['data']['total'] > 0
+
+    @pytest.mark.run(order=3)
+    def test_get_configuration_of_book_list(self):
+        """
+        测试是否能获取每个书单的配置
+        """
+        api = api_info[23]
+        api['api_headers']['Authorization'] = tokens['token']
+        for i in range(book_list_info.__len__()):
+            api['api_params']['id'] = book_list_info[i]['id']
+            r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
+            # print('book list id is: ' + str(book_list_info[i]['id']))
+            assert r.status_code == 200
+            r_json = json.loads(r.text)
+            # print(r_json)
+            assert r_json['code'] == 0
+            assert r_json['data']['title'] == book_list_info[i]['book_list_title']
