@@ -131,6 +131,7 @@ class TestBookshelfAddAndDeleteFavorite:
     '''
     测试在个人书架-我的收藏中添加/删除图书
     添加成功后，我的收藏列表新增对应图书；删除成功后，我的收藏列表减少对应图书
+    添加时，若书籍已存在我的收藏列表中，则code为720897，msg为"该书籍已在书架中"
     '''
 
     @pytest.mark.run(order=1)
@@ -166,7 +167,7 @@ class TestBookshelfAddAndDeleteFavorite:
     @pytest.mark.run(order=3)
     def test_bookshelf_add_favorite(self):
         '''
-        在个人书架-我的藏书添加图书
+        在个人书架-我的藏书添加图书（添加成功）
         '''
         api = api_info[36]
         api['api_headers']['Authorization'] = tokens['token']
@@ -192,6 +193,20 @@ class TestBookshelfAddAndDeleteFavorite:
         assert r_json['data']['items'][0]['title'] == bookshelf_book_info['name']
 
     @pytest.mark.run(order=5)
+    def test_bookshelf_add_same_favorite(self):
+        '''
+        在个人书架-我的藏书添加图书（重复添加）
+        '''
+        api = api_info[36]
+        api['api_headers']['Authorization'] = tokens['token']
+        api['api_body']['spu_id'] = bookshelf_book_info['spu_id']
+        r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
+        assert r.status_code == 200
+        r_json = json.loads(r.text)
+        assert r_json['code'] == 720897
+        assert r_json['msg'] == '该书籍已在书架中'
+
+    @pytest.mark.run(order=6)
     def test_bookshelf_delete_favorites(self):
         '''
         删除指定spu_id对应的记录
@@ -204,7 +219,7 @@ class TestBookshelfAddAndDeleteFavorite:
         r_json = json.loads(r.text)
         assert r_json['code'] == 0
 
-    @pytest.mark.run(order=6)
+    @pytest.mark.run(order=7)
     def test_is_delete_success(self):
         '''
         获取我的藏书列表，列表中无对应书籍 且 藏书总数是否与第一次获取列表时不发生变化
