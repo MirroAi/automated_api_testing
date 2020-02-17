@@ -29,16 +29,16 @@ def send_requests(method, url, params=None, json=None, headers=None, **kwargs):
 
 
 class TestAddAddress:
-    '''
+    """
     测试新增地址功能
     新增成功后，地址列表长度+1，地址列表最后一项为新增地址
-    '''
+    """
 
     @pytest.mark.run(order=1)
     def test_get_address_list(self):
-        '''
+        """
         获取用户地址列表
-        '''
+        """
         global address_total
         api = api_info[12]
         api['api_headers']['Authorization'] = tokens['token']
@@ -51,9 +51,9 @@ class TestAddAddress:
 
     @pytest.mark.run(order=2)
     def test_add_address(self):
-        '''
+        """
         添加地址
-        '''
+        """
         api = api_info[13]
         api['api_headers']['Authorization'] = tokens['token']
         api['api_body']['recipients'] = address_recipients
@@ -64,9 +64,9 @@ class TestAddAddress:
 
     @pytest.mark.run(order=3)
     def test_get_address_new_list(self):
-        '''
+        """
         获取用户地址列表
-        '''
+        """
         api = api_info[12]
         api['api_headers']['Authorization'] = tokens['token']
         r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
@@ -78,16 +78,16 @@ class TestAddAddress:
 
 
 class TestModifyAddress:
-    '''
+    """
     测试修改地址功能
     修改成功后，原地址相应信息发生改变；地址列表长度不变
-    '''
+    """
 
     @pytest.mark.run(order=1)
     def test_get_address_list(self):
-        '''
+        """
         获取用户地址列表
-        '''
+        """
         global address_id
         global address_total
         api = api_info[12]
@@ -101,9 +101,9 @@ class TestModifyAddress:
 
     @pytest.mark.run(order=2)
     def test_modify_address(self):
-        '''
+        """
         修改地址
-        '''
+        """
         api = api_info[14]
         api['api_headers']['Authorization'] = tokens['token']
         api['api_body']['recipients'] = address_recipients
@@ -115,9 +115,9 @@ class TestModifyAddress:
 
     @pytest.mark.run(order=3)
     def test_get_modify_result(self):
-        '''
+        """
         验证修改后地址是否与提交内容一致
-        '''
+        """
         api = api_info[12]
         api['api_headers']['Authorization'] = tokens['token']
         r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
@@ -131,17 +131,17 @@ class TestModifyAddress:
 
 
 class TestBookshelfAddAndDeleteFavorite:
-    '''
+    """
     测试在个人书架-我的收藏中添加/删除图书
     添加成功后，我的收藏列表新增对应图书；删除成功后，我的收藏列表减少对应图书
     添加时，若书籍已存在我的收藏列表中，则code为720897，msg为"该书籍已在书架中"
-    '''
+    """
 
     @pytest.mark.run(order=1)
     def test_get_bookshelf_favorite_list(self):
-        '''
+        """
         获取我的藏书列表
-        '''
+        """
         global bookshelf_total
         api = api_info[28]
         api['api_headers']['Authorization'] = tokens['token']
@@ -153,9 +153,9 @@ class TestBookshelfAddAndDeleteFavorite:
 
     @pytest.mark.run(order=2)
     def test_query_book_spu_id(self):
-        '''
+        """
         通过isbn获取spu_id
-        '''
+        """
         global bookshelf_book_info
         api = api_info[35]
         api['api_headers']['Authorization'] = tokens['token']
@@ -169,9 +169,9 @@ class TestBookshelfAddAndDeleteFavorite:
 
     @pytest.mark.run(order=3)
     def test_bookshelf_add_favorite(self):
-        '''
+        """
         在个人书架-我的藏书添加图书（添加成功）
-        '''
+        """
         api = api_info[36]
         api['api_headers']['Authorization'] = tokens['token']
         api['api_body']['spu_id'] = bookshelf_book_info['spu_id']
@@ -182,9 +182,9 @@ class TestBookshelfAddAndDeleteFavorite:
 
     @pytest.mark.run(order=4)
     def test_is_add_success(self):
-        '''
+        """
         获取我的藏书列表，第一位是否为新添加的书 且 藏书总数是否+1
-        '''
+        """
         api = api_info[28]
         api['api_headers']['Authorization'] = tokens['token']
         r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
@@ -197,9 +197,9 @@ class TestBookshelfAddAndDeleteFavorite:
 
     @pytest.mark.run(order=5)
     def test_bookshelf_add_same_favorite(self):
-        '''
+        """
         在个人书架-我的藏书添加图书（重复添加）
-        '''
+        """
         api = api_info[36]
         api['api_headers']['Authorization'] = tokens['token']
         api['api_body']['spu_id'] = bookshelf_book_info['spu_id']
@@ -211,9 +211,9 @@ class TestBookshelfAddAndDeleteFavorite:
 
     @pytest.mark.run(order=6)
     def test_bookshelf_delete_favorites(self):
-        '''
+        """
         删除指定spu_id对应的记录
-        '''
+        """
         api = api_info[39]
         api['api_headers']['Authorization'] = tokens['token']
         api['api_body']['spu_ids'][0] = bookshelf_book_info['spu_id']
@@ -224,9 +224,9 @@ class TestBookshelfAddAndDeleteFavorite:
 
     @pytest.mark.run(order=7)
     def test_is_delete_success(self):
-        '''
+        """
         获取我的藏书列表，列表中无对应书籍 且 藏书总数是否与第一次获取列表时不发生变化
-        '''
+        """
         api = api_info[28]
         api['api_headers']['Authorization'] = tokens['token']
         r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
@@ -240,17 +240,17 @@ class TestBookshelfAddAndDeleteFavorite:
 
 
 class TestModifyBookshelfUserProfileSignature:
-    '''
+    """
     测试个人书架页修改个人简介
     修改成功，再次获取个人书架-个人信息时，获取到的signature应该是修改内容
     修改内容为空字符串时，接口报修改成功，实际未修改数据库中对应字段值
-    '''
+    """
 
     @pytest.mark.run(order=1)
     def test_get_user_profilelite(self):
-        '''
+        """
         获取个人书架，我的个人信息
-        '''
+        """
         global bookshelf_user_old_signature
         api = api_info[27]
         api['api_headers']['Authorization'] = tokens['token']
@@ -262,9 +262,9 @@ class TestModifyBookshelfUserProfileSignature:
 
     @pytest.mark.run(order=2)
     def test_modify_bookshelf_user_signature(self):
-        '''
+        """
         修改个人简介
-        '''
+        """
         api = api_info[38]
         api['api_headers']['Authorization'] = tokens['token']
         api['api_body']['signature'] = new_signature
@@ -275,9 +275,9 @@ class TestModifyBookshelfUserProfileSignature:
 
     @pytest.mark.run(order=3)
     def test_modified_signature_is_correct(self):
-        '''
+        """
         校验新获取的用户信息signature是否与修改内容一致
-        '''
+        """
         api = api_info[27]
         api['api_headers']['Authorization'] = tokens['token']
         r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
