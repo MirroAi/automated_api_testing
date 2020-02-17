@@ -17,6 +17,9 @@ bookshelf_isbn = ['9787115454157']  # 流畅的python
 bookshelf_book_info = {'name': 'test_name', 'spu_id': 'test_spu'}
 bookshelf_total = 0
 
+bookshelf_user_old_signature = ''
+new_signature = get_random_recipients()  # new_signature = '' 空字符串，即可以运行出bug
+
 
 def send_requests(method, url, params=None, json=None, headers=None, **kwargs):
     test_session = HttpRequests()
@@ -234,3 +237,52 @@ class TestBookshelfAddAndDeleteFavorite:
         for item in r_json['data']['items']:
             assert item['id'] != bookshelf_book_info['spu_id']
             assert item['title'] != bookshelf_book_info['name']
+
+
+class TestModifyBookshelfUserProfileSignature:
+    '''
+    测试个人书架页修改个人简介
+    修改成功，再次获取个人书架-个人信息时，获取到的signature应该是修改内容
+    修改内容为空字符串时，接口报修改成功，实际未修改数据库中对应字段值
+    '''
+
+    @pytest.mark.run(order=1)
+    def test_get_user_profilelite(self):
+        '''
+        获取个人书架，我的个人信息
+        '''
+        global bookshelf_user_old_signature
+        api = api_info[27]
+        api['api_headers']['Authorization'] = tokens['token']
+        r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
+        assert r.status_code == 200
+        r_json = json.loads(r.text)
+        assert r_json['code'] == 0
+        bookshelf_user_old_signature += r_json['data']['signature']
+
+    @pytest.mark.run(order=2)
+    def test_modify_bookshelf_user_signature(self):
+        '''
+        修改个人简介
+        '''
+        api = api_info[38]
+        api['api_headers']['Authorization'] = tokens['token']
+        api['api_body']['signature'] = new_signature
+        r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
+        assert r.status_code == 200
+        r_json = json.loads(r.text)
+        assert r_json['code'] == 0
+
+    @pytest.mark.run(order=3)
+    def test_modified_signature_is_correct(self):
+        '''
+        校验新获取的用户信息signature是否与修改内容一致
+        '''
+        api = api_info[27]
+        api['api_headers']['Authorization'] = tokens['token']
+        r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
+        assert r.status_code == 200
+        r_json = json.loads(r.text)
+        assert r_json['code'] == 0
+        assert r_json['data']['signature'] != bookshelf_user_old_signature or r_json['data']['signature'] == new_signature
+
