@@ -45,9 +45,9 @@ class TestAddAddress:
         r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
         assert r.status_code == 200
         r_json = json.loads(r.text)
+        assert r_json['code'] == 0
         address_total = r_json['data']['total']
         # print(self.address_total)
-        assert r_json['code'] == 0
 
     @pytest.mark.run(order=2)
     def test_add_address(self):
@@ -95,9 +95,9 @@ class TestModifyAddress:
         r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
         assert r.status_code == 200
         r_json = json.loads(r.text)
+        assert r_json['code'] == 0
         address_id = r_json['data']['list'][1]['id']
         address_total = r_json['data']['total']
-        assert r_json['code'] == 0
 
     @pytest.mark.run(order=2)
     def test_modify_address(self):
@@ -123,10 +123,10 @@ class TestModifyAddress:
         r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
         assert r.status_code == 200
         r_json = json.loads(r.text)
+        assert r_json['code'] == 0
         for address in r_json['data']['list']:
             if address['id'] == address_id:
                 assert address['recipients'] == address_recipients
-        assert r_json['code'] == 0
         assert r_json['data']['total'] == address_total
 
 
@@ -148,8 +148,8 @@ class TestBookshelfAddAndDeleteFavorite:
         r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
         assert r.status_code == 200
         r_json = json.loads(r.text)
-        bookshelf_total = r_json['data']['total']
         assert r_json['code'] == 0
+        bookshelf_total = r_json['data']['total']
 
     @pytest.mark.run(order=2)
     def test_query_book_spu_id(self):
@@ -163,9 +163,9 @@ class TestBookshelfAddAndDeleteFavorite:
         r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
         assert r.status_code == 200
         r_json = json.loads(r.text)
+        assert r_json['code'] == 0
         bookshelf_book_info['name'] = r_json['data']['items'][0]['name']
         bookshelf_book_info['spu_id'] = r_json['data']['items'][0]['spu_id']
-        assert r_json['code'] == 0
 
     @pytest.mark.run(order=3)
     def test_bookshelf_add_favorite(self):
