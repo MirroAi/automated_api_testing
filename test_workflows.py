@@ -28,6 +28,10 @@ book_group_info = {}  # 最后格式如 {0:{'id': 'group_id', 'book_group_title'
 book_group_add_attention_ids = []
 test_book_group_id = 0
 
+recycle_cart_isbn = ['9787115454157', '9787544270878', '9787544242516', '9787546302393', '9787544241694', '9787532725694']
+recycle_cart_book_info = {}  # 最后格式如 {'isbn':{'spu_id': 'spu_id', 'name': 'name', 'original_price': 'original_price', 'id': 'recycle_cart_id'}, 'isbn2': ... }
+recycle_cart_book_num = 0
+
 
 def send_requests(method, url, params=None, json=None, headers=None, **kwargs):
     test_session = HttpRequests()
@@ -491,3 +495,123 @@ class TestAddAndDeleteAttentionOfBookGroup:
         for i in range(len(r_json['data']['groups'])):
             if r_json['data']['groups'][i]['id'] == test_book_group_id:
                 assert r_json['data']['groups'][i]['selected'] is True
+
+
+class TestAddAndDeleteBookToRecycleCart:
+    """
+    测试添加/删除书籍到回收车
+    """
+
+    @pytest.mark.run(order=1)
+    def test_get_recycle_cart_books(self):
+        """
+        获取回收车中书籍
+        """
+        global recycle_cart_book_num
+        api = api_info[46]
+        api['api_headers']['Authorization'] = tokens['token']
+        r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
+        assert r.status_code == 200
+        r_json = json.loads(r.text)
+        assert r_json['code'] == 0
+        recycle_cart_book_num = r_json['data']['quantity']
+
+    @pytest.mark.run(order=2)
+    def test_get_book_spu_id(self):
+        """
+        通过书籍isbn获取spu_id
+        """
+        global recycle_cart_book_info
+        api = api_info[47]
+        api['api_headers']['Authorization'] = tokens['token']
+        for isbn in recycle_cart_isbn:
+            api['api_params']['scan_value'] = isbn
+            r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
+            assert r.status_code == 200
+            r_json = json.loads(r.text)
+            assert r_json['code'] == 0
+            recycle_cart_book_info[isbn] = {'spu_id': r_json['data']['items'][0]['spu_id'], 'name': r_json['data']['items'][0]['name'], 'original_price': r_json['data']['items'][0]['original_price']}
+        # print(recycle_cart_book_info)
+
+    @pytest.mark.run(order=3)
+    def test_add_book_to_recycle_cart(self):
+        """
+        添加书籍到回收车
+        """
+        global recycle_cart_book_num
+        api = api_info[48]
+        api['api_headers']['Authorization'] = tokens['token']
+        for isbn in recycle_cart_isbn:
+            api['api_body']['spu_id'] = recycle_cart_book_info[isbn]['spu_id']
+            r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
+            assert r.status_code == 200
+            r_json = json.loads(r.text)
+            assert r_json['code'] == 0
+            recycle_cart_book_num += 1
+
+    @pytest.mark.run(order=4)
+    def test_is_add_success(self):
+        """
+        校验是否添加成功（添加前回收车中书籍数量为0）
+        """
+        global recycle_cart_book_info
+        api = api_info[46]
+        api['api_headers']['Authorization'] = tokens['token']
+        r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
+        assert r.status_code == 200
+        r_json = json.loads(r.text)
+        assert r_json['code'] == 0
+        assert recycle_cart_book_num == r_json['data']['quantity']  # 断言添加成功后total数量有没有相应增加
+        for i in range(len(r_json['data']['items'])):  # 拿获取的回收车书籍列表与添加图书的列表对比是否一致
+            spu_id = r_json['data']['items'][i]['spu_id']
+            name = r_json['data']['items'][i]['name']
+            original_price = r_json['data']['items'][i]['original_price']
+            for isbn in recycle_cart_isbn:
+                if recycle_cart_book_info[isbn]['spu_id'] == spu_id:
+                    assert name == recycle_cart_book_info[isbn]['name']
+                    assert original_price == recycle_cart_book_info[isbn]['original_price']
+                    recycle_cart_book_info[isbn]['id'] = str(r_json['data']['items'][i]['id'])
+        # print(recycle_cart_book_info)
+
+    @pytest.mark.run(order=5)
+    def test_delete_book_in_recycle_cart(self):
+        """
+        在回收车删除书籍
+        """
+        global recycle_cart_book_num
+        api = api_info[77]
+        api['api_headers']['Authorization'] = tokens['token']
+        for isbn in recycle_cart_isbn:
+            api['api_body']['id'] = recycle_cart_book_info[isbn]['id']
+            r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
+            assert r.status_code == 200
+            r_json = json.loads(r.text)
+            assert r_json['code'] == 0
+            recycle_cart_book_num -= 1
+
+    @pytest.mark.run(order=6)
+    def test_is_delete_success(self):
+        """
+        校验是否删除成功
+        """
+        flag = 0
+        api = api_info[46]
+        api['api_headers']['Authorization'] = tokens['token']
+        r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
+        assert r.status_code == 200
+        r_json = json.loads(r.text)
+        assert r_json['code'] == 0
+        assert recycle_cart_book_num == r_json['data']['quantity']
+        if recycle_cart_book_num == 0:
+            assert len(r_json['data']['items']) == 0
+        else:
+            for i in range(len(r_json['data']['items'])):  # 拿获取的回收车书籍列表与添加图书的列表对比，是否没删除掉
+                isbn = r_json['data']['items'][i]['description_units'][0]['value']
+                try:
+                    print(recycle_cart_book_info[isbn])  # 如果响应中还能找到对应isbn
+                except KeyError:
+                    flag = 0
+                else:
+                    flag = 1
+                finally:
+                    assert flag == 0
