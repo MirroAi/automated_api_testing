@@ -4,6 +4,7 @@
 
 import pytest
 import json
+import random
 from api_information import api_info, tokens, main_url
 from test_get_apis import HttpRequests
 from tools import get_random_recipients
@@ -23,6 +24,9 @@ new_signature = get_random_recipients()  # new_signature = '' 空字符串，即
 book_list_info = {}  # 最后格式如 {0:{'id': 'list_id', 'book_list_title': 'title'}, 1: ... }
 
 book_group_info = {}  # 最后格式如 {0:{'id': 'group_id', 'book_group_title': 'title'}, 1: ... }
+
+book_group_add_attention_ids = []
+test_book_group_id = 0
 
 
 def send_requests(method, url, params=None, json=None, headers=None, **kwargs):
@@ -401,3 +405,89 @@ class TestGetBooksOfEveryBookGroup:
             assert r_json['code'] == 0
             assert r_json['message'] == 'OK'
             assert r_json['data']['total'] > 0  # 分类下的图书列表，书籍数量应该>0
+
+
+class TestAddAndDeleteAttentionOfBookGroup:
+    """
+    测试对分类添加关注和取消关注
+    """
+
+    @pytest.mark.run(order=1)
+    def test_get_all_book_group_ids(self):
+        """
+        获取全部分类信息，主要是分类id、分类名、是否关注标志
+        """
+        global book_group_add_attention_ids
+        global test_book_group_id
+        api = api_info[19]
+        api['api_headers']['Authorization'] = tokens['Bearer_token']
+        r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
+        assert r.status_code == 200
+        r_json = json.loads(r.text)
+        assert r_json['code'] == 0
+        for i in range(len(r_json['data']['groups'])):
+            if r_json['data']['groups'][i]['selected'] is True:  # 用来判断是否有已选中的分类，用户必须选有分类（取消完所有分类时，自动使用默认推荐分类）
+                book_group_add_attention_ids.append(r_json['data']['groups'][i]['id'])
+        # print(book_group_add_attention_ids)
+        test_book_group_id = book_group_add_attention_ids[random.randint(0, len(book_group_add_attention_ids))]
+        # print(test_book_group_id)
+
+    @pytest.mark.run(order=2)
+    def test_delete_attention_of_book_group(self):
+        """
+        对一个已关注分类取消关注
+        """
+        api = api_info[72]
+        api['api_headers']['Authorization'] = tokens['Bearer_token']
+        api['api_body']['id'] = test_book_group_id
+        r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
+        assert r.status_code == 200
+        r_json = json.loads(r.text)
+        assert r_json['code'] == 0
+        assert r_json['message'] == 'OK'
+
+    @pytest.mark.run(order=3)
+    def test_delete_attention_is_success(self):
+        """
+        获取全部分类信息，查看已取消关注的分类的是否关注标志为false
+        """
+        api = api_info[19]
+        api['api_headers']['Authorization'] = tokens['Bearer_token']
+        r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
+        assert r.status_code == 200
+        r_json = json.loads(r.text)
+        assert r_json['code'] == 0
+        # print(r_json)
+        for i in range(len(r_json['data']['groups'])):
+            if r_json['data']['groups'][i]['id'] == test_book_group_id:
+                assert r_json['data']['groups'][i]['selected'] is False
+
+    @pytest.mark.run(order=4)
+    def test_add_attention_of_book_group(self):
+        """
+        对已取消关注的分类添加关注
+        """
+        api = api_info[72]
+        api['api_headers']['Authorization'] = tokens['Bearer_token']
+        api['api_body']['id'] = test_book_group_id
+        api['api_body']['action'] = '1'
+        r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
+        assert r.status_code == 200
+        r_json = json.loads(r.text)
+        assert r_json['code'] == 0
+        assert r_json['message'] == 'OK'
+
+    @pytest.mark.run(order=5)
+    def test_add_attention_is_success(self):
+        """
+        获取全部分类信息，查看添加关注的分类的是否关注标志为true
+        """
+        api = api_info[19]
+        api['api_headers']['Authorization'] = tokens['Bearer_token']
+        r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
+        assert r.status_code == 200
+        r_json = json.loads(r.text)
+        assert r_json['code'] == 0
+        for i in range(len(r_json['data']['groups'])):
+            if r_json['data']['groups'][i]['id'] == test_book_group_id:
+                assert r_json['data']['groups'][i]['selected'] is True
