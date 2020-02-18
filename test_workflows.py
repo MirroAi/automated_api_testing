@@ -22,6 +22,8 @@ new_signature = get_random_recipients()  # new_signature = '' 空字符串，即
 
 book_list_info = {}  # 最后格式如 {0:{'id': 'list_id', 'book_list_title': 'title'}, 1: ... }
 
+book_group_info = {}  # 最后格式如 {0:{'id': 'group_id', 'book_group_title': 'title'}, 1: ... }
+
 
 def send_requests(method, url, params=None, json=None, headers=None, **kwargs):
     test_session = HttpRequests()
@@ -291,7 +293,7 @@ class TestModifyBookshelfUserProfileSignature:
 
 class TestGetBooksAndConfigurationOfEveryBookList:
     """
-    测试获取每个书单中的图书
+    测试获取每个书单中的图书以及书单配置
     """
 
     @pytest.mark.run(order=1)
@@ -354,3 +356,48 @@ class TestGetBooksAndConfigurationOfEveryBookList:
             # print(r_json)
             assert r_json['code'] == 0
             assert r_json['data']['title'] == book_list_info[i]['book_list_title']
+
+
+class TestGetBooksOfEveryBookGroup:
+    """
+    测试获取每个分类中的图书
+    """
+
+    @pytest.mark.run(order=1)
+    def test_get_all_book_group_ids(self):
+        """
+        获取全部分类id
+        """
+        global book_group_info
+        flag = 1
+        api = api_info[19]
+        api['api_headers']['Authorization'] = tokens['token']
+        r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
+        assert r.status_code == 200
+        r_json = json.loads(r.text)
+        assert r_json['code'] == 0
+        for i in range(len(r_json['data']['groups'])):
+            book_group_info[i] = {'id': r_json['data']['groups'][i]['id'], 'name': r_json['data']['groups'][i]['name'], 'selected': r_json['data']['groups'][i]['selected']}
+            if book_group_info[i]['selected'] is False:  # 用来判断是否有已选中的分类，用户必须选有分类
+                flag = flag * 1
+            else:
+                flag = flag * 0
+        assert flag == 0
+        # print(book_group_info)
+
+    @pytest.mark.run(order=2)
+    def test_get_books_of_book_group(self):
+        """
+        获取每个分类下的图书
+        """
+        api = api_info[22]
+        api['api_headers']['Authorization'] = tokens['token']
+        for i in range(book_group_info.__len__()):
+            api['api_params']['group_id'] = book_group_info[i]['id']
+            r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
+            # print('book group id is: ' + str(book_group_info[i]['id']))
+            assert r.status_code == 200
+            r_json = json.loads(r.text)
+            assert r_json['code'] == 0
+            assert r_json['message'] == 'OK'
+            assert r_json['data']['total'] > 0  # 分类下的图书列表，书籍数量应该>0
