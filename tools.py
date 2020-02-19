@@ -64,20 +64,21 @@ from api_information import api_info, main_url, tokens
 # # apis = {
 # #     case_id:{'api_group':api_group, 'api_name':api_name, ...},
 # # }
-# with openpyxl.load_workbook('manyoujing_APIs.xlsx') as wb:
-#     sh = wb['Sheet1']  # 选取表单
-#     sh_contain = list(sh.rows)
+# wb = openpyxl.load_workbook('manyoujing_APIs.xlsx')
+# sh = wb['Sheet1']  # 选取表单
+# sh_contain = list(sh.rows)
+# wb.close()
 #
-#     for cases in list(sh.rows)[1:]:
-#         case_id = cases[0].value
-#         api_group = cases[1].value
-#         api_name = cases[2].value
-#         api_method = cases[3].value.upper()
-#         api_url = cases[4].value
-#         api_headers = cases[5].value
-#         api_params = cases[6].value
-#         api_body = cases[7].value
-#         d[case_id] = make_dict(api_group, api_name, api_method, api_url, api_headers, api_params, api_body)
+# for cases in sh_contain[1:]:
+#     case_id = cases[0].value
+#     api_group = cases[1].value
+#     api_name = cases[2].value
+#     api_method = cases[3].value.upper()
+#     api_url = cases[4].value
+#     api_headers = cases[5].value
+#     api_params = cases[6].value
+#     api_body = cases[7].value
+#     d[case_id] = make_dict(api_group, api_name, api_method, api_url, api_headers, api_params, api_body)
 #
 # for i in range(d.__len__()):
 #     print(d[i+1])
@@ -102,7 +103,13 @@ def get_random_recipients():
     s = ''
     for i in range(3):
         s += recipient_names[random.randint(0, len(recipient_names)-1)]
-    return  s
+    return s
 
 
 # print(get_random_recipients())
+
+import time
+
+
+def str_to_timestamp(time_string):  # 2020-02-24 15:15:15
+    return int(time.mktime(time.strptime(time_string, "%Y-%m-%d %H:%M:%S")))
