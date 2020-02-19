@@ -5,7 +5,6 @@
 import pytest
 import json
 import random
-import time
 from api_information import api_info, tokens, main_url
 from test_get_apis import HttpRequests
 from tools import get_random_recipients, str_to_timestamp
@@ -43,6 +42,10 @@ old_pickup_time = {}
 new_pickup_time = {}
 recycle_order_id = ''
 
+sell_cart_spu_ids = ['9632856317100035', '9632989018587137', '9633052173008896', '9632558189117440', '9634357812396038']  # 岛上书店，好吗好的，乖摸摸头，我不，你坏
+sell_cart_sku_ids = {}  # {spu:sku, spu2:sku2, ...}
+sell_cart_book_info = {}  # {'spu':{'sku':'sku', 'id':'id', 'select':'select_flag', 'stocks':stock_num}, 'spu2':...}
+sell_cart_total = 0
 
 
 def send_requests(method, url, params=None, json=None, headers=None, **kwargs):
@@ -97,7 +100,7 @@ class TestAddAddress:
         assert r.status_code == 200
         r_json = json.loads(r.text)
         assert r_json['code'] == 0
-        assert r_json['data']['total'] == address_total+1
+        assert r_json['data']['total'] == address_total + 1
         assert r_json['data']['list'][-1]['recipients'] == address_recipients
 
 
@@ -445,7 +448,7 @@ class TestAddAndDeleteAttentionOfBookGroup:
             if r_json['data']['groups'][i]['selected'] is True:  # 用来判断是否有已选中的分类，用户必须选有分类（取消完所有分类时，自动使用默认推荐分类）
                 book_group_add_attention_ids.append(r_json['data']['groups'][i]['id'])
         # print(book_group_add_attention_ids)
-        test_book_group_id = book_group_add_attention_ids[random.randint(0, len(book_group_add_attention_ids)-1)]
+        test_book_group_id = book_group_add_attention_ids[random.randint(0, len(book_group_add_attention_ids) - 1)]
         # print(test_book_group_id)
 
     @pytest.mark.run(order=2)
@@ -696,15 +699,15 @@ class TestRecycleOrder:
         assert r.status_code == 200
         r_json = json.loads(r.text)
         assert r_json['code'] == 0
-        old_address = r_json['data']['list'][random.randint(0, r_json['data']['total']-1)]
+        old_address = r_json['data']['list'][random.randint(0, r_json['data']['total'] - 1)]
         old_address_id = old_address['id']
         old_address_detail['sender_name'] = old_address['recipients']
         old_address_detail['sender_tel'] = old_address['tel']
         old_address_detail['address_town'] = old_address['town']
         old_address_detail['address_detailed'] = old_address['detail']
-        new_address = r_json['data']['list'][random.randint(0, r_json['data']['total']-1)]
+        new_address = r_json['data']['list'][random.randint(0, r_json['data']['total'] - 1)]
         while new_address == old_address:
-            new_address = r_json['data']['list'][random.randint(0, r_json['data']['total']-1)]
+            new_address = r_json['data']['list'][random.randint(0, r_json['data']['total'] - 1)]
         new_address_id = new_address['id']
         new_address_detail['sender_name'] = new_address['recipients']
         new_address_detail['sender_tel'] = new_address['tel']
@@ -724,10 +727,10 @@ class TestRecycleOrder:
         assert r.status_code == 200
         r_json = json.loads(r.text)
         assert r_json['code'] == 0
-        old_num = random.randint(0, len(r_json['data'])-1)
-        new_num = random.randint(0, len(r_json['data'])-1)
+        old_num = random.randint(0, len(r_json['data']) - 1)
+        new_num = random.randint(0, len(r_json['data']) - 1)
         while new_num == old_num:
-            new_num = random.randint(0, len(r_json['data'])-1)
+            new_num = random.randint(0, len(r_json['data']) - 1)
         # print(r_json['data'][old_num]['date'][:10])
         # print(r_json['data'][new_num]['date'][:10])
         # print(r_json['data'][old_num]['periods'][0])
@@ -867,3 +870,126 @@ class TestRecycleOrder:
         r_json = json.loads(r.text)
         assert r_json['code'] == 0
         assert r_json['data']['order']['status'] == -1
+
+
+class TestAddAndDeleteBookToSellCart:
+    """
+    测试在购物车中添加/删除图书
+    """
+
+    @pytest.mark.run(order=1)
+    def test_get_sell_cart_books(self):
+        """
+        获取购物车中图书，按库存数量分为有货、无货；按选中状态分为选中、未选中
+        """
+        global sell_cart_total
+        api = api_info[55]
+        api['api_headers']['Authorization'] = tokens['token']
+        r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
+        assert r.status_code == 200
+        r_json = json.loads(r.text)
+        assert r_json['code'] == 0
+        sell_cart_total = r_json['data']['total']
+
+    @pytest.mark.run(order=2)
+    def test_get_book_sku_id(self):
+        """
+        通过spu获取sku，sku用来加购物车
+        """
+        global sell_cart_sku_ids
+        api = api_info[78]
+        api['api_headers']['Authorization'] = tokens['token']
+        for spu_id in sell_cart_spu_ids:
+            api['api_params']['spu_id'] = spu_id
+            r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
+            assert r.status_code == 200
+            r_json = json.loads(r.text)
+            assert r_json['code'] == 0
+            for item in r_json['data']['list']:
+                # print(item)
+                if item['stock_num'] > 0:  # 获取第一项有库存的书，其sku记在要加入购物车的sku中
+                    sell_cart_sku_ids[spu_id] = item['sku_id']
+                    break
+        # print(sell_cart_sku_ids)
+
+    @pytest.mark.run(order=3)
+    def test_add_book_to_sell_cart(self):
+        """
+        向购物车中添加图书
+        """
+        global sell_cart_total
+        sku_ids = []
+        for v in sell_cart_sku_ids.values():
+            sku_ids.append(v)
+        api = api_info[53]
+        api['api_headers']['Authorization'] = tokens['token']
+        api['api_body']['sku_ids'] = sku_ids
+        r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
+        assert r.status_code == 200
+        r_json = json.loads(r.text)
+        assert r_json['code'] == 0
+        sell_cart_total += len(sku_ids)
+
+    @pytest.mark.run(order=4)
+    def test_add_book_is_success(self):
+        """
+        获取购物车列表，看添加图书是否成功
+        """
+        global sell_cart_book_info
+        api = api_info[55]
+        api['api_headers']['Authorization'] = tokens['token']
+        r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
+        assert r.status_code == 200
+        r_json = json.loads(r.text)
+        assert r_json['code'] == 0
+        assert r_json['data']['total'] == sell_cart_total
+        for k, v in sell_cart_sku_ids.items():
+            flag = 0
+            for good_info in r_json['data']['list']:
+                if good_info['goods']['spu_id'] == k:  # 能在购物车列表中找到加入的商品，flag为1；找不到，则flag为0
+                    assert good_info['goods']['sku_id'] == v
+                    flag = 1
+                    sell_cart_book_info[good_info['goods']['spu_id']] = {'sku': good_info['goods']['sku_id'],
+                                                                         'id': good_info['id'],
+                                                                         'select': good_info['select'],
+                                                                         'stocks': good_info['stocks']}
+            assert flag == 1
+
+    @pytest.mark.run(order=5)
+    def test_delete_book_in_sell_cart(self):
+        """
+        在购物车中删除图书
+        """
+        global sell_cart_total
+        ids = []
+        for k in sell_cart_sku_ids.keys():
+            ids.append(sell_cart_book_info[k]['id'])
+        api = api_info[54]
+        api['api_headers']['Authorization'] = tokens['token']
+        api['api_body']['ids'] = ids
+        r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
+        assert r.status_code == 200
+        r_json = json.loads(r.text)
+        assert r_json['code'] == 0
+        sell_cart_total -= len(ids)
+
+    @pytest.mark.run(order=6)
+    def test_delete_book_is_success(self):
+        """
+        获取购物车列表，看删除图书是否成功
+        """
+        api = api_info[55]
+        api['api_headers']['Authorization'] = tokens['token']
+        r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'],
+                          api['api_headers'], verify=False)
+        assert r.status_code == 200
+        r_json = json.loads(r.text)
+        assert r_json['code'] == 0
+        assert r_json['data']['total'] == sell_cart_total
+        for k, v in sell_cart_sku_ids.items():
+            flag = 1
+            for good_info in r_json['data']['list']:
+                if good_info['goods']['spu_id'] == k:  # 能在购物车列表中找到加入的商品，flag为0；找不到，则flag为1
+                    assert good_info['goods']['sku_id'] == v
+                    flag = 0
+            assert flag == 1
