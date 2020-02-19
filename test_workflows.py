@@ -5,9 +5,10 @@
 import pytest
 import json
 import random
+import time
 from api_information import api_info, tokens, main_url
 from test_get_apis import HttpRequests
-from tools import get_random_recipients
+from tools import get_random_recipients, str_to_timestamp
 
 
 address_total = 0
@@ -31,6 +32,17 @@ test_book_group_id = 0
 recycle_cart_isbn = ['9787115454157', '9787544270878', '9787544242516', '9787546302393', '9787544241694', '9787532725694']
 recycle_cart_book_info = {}  # 最后格式如 {'isbn':{'spu_id': 'spu_id', 'name': 'name', 'original_price': 'original_price', 'id': 'recycle_cart_id'}, 'isbn2': ... }
 recycle_cart_book_num = 0
+
+create_recycle_order_cart_book_info = {}
+create_recycle_order_cart_num = 0
+old_address_id = 0
+old_address_detail = {}
+new_address_id = 0
+new_address_detail = {}
+old_pickup_time = {}
+new_pickup_time = {}
+recycle_order_id = ''
+
 
 
 def send_requests(method, url, params=None, json=None, headers=None, **kwargs):
@@ -433,7 +445,7 @@ class TestAddAndDeleteAttentionOfBookGroup:
             if r_json['data']['groups'][i]['selected'] is True:  # 用来判断是否有已选中的分类，用户必须选有分类（取消完所有分类时，自动使用默认推荐分类）
                 book_group_add_attention_ids.append(r_json['data']['groups'][i]['id'])
         # print(book_group_add_attention_ids)
-        test_book_group_id = book_group_add_attention_ids[random.randint(0, len(book_group_add_attention_ids))]
+        test_book_group_id = book_group_add_attention_ids[random.randint(0, len(book_group_add_attention_ids)-1)]
         # print(test_book_group_id)
 
     @pytest.mark.run(order=2)
@@ -615,3 +627,243 @@ class TestAddAndDeleteBookToRecycleCart:
                     flag = 1
                 finally:
                     assert flag == 0
+
+
+class TestRecycleOrder:
+    """
+    测试生成回收订单、修改回收订单收货地址、修改回收订单取件时间、取消回收订单流程
+    生成回收订单时，需要选择有效地址、取件时间，将回收车内的所有书创建为一个回收单
+    生成成功后，该回收订单的详情信息应与回收车中书籍详情一致
+    """
+
+    @pytest.mark.run(order=1)
+    def test_get_recycle_cart_books(self):
+        """
+        获取回收车中书籍
+        """
+        global create_recycle_order_cart_num
+        api = api_info[46]
+        api['api_headers']['Authorization'] = tokens['token']
+        r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
+        assert r.status_code == 200
+        r_json = json.loads(r.text)
+        assert r_json['code'] == 0
+        create_recycle_order_cart_num = r_json['data']['quantity']
+
+    @pytest.mark.run(order=2)
+    def test_get_book_spu_id(self):
+        """
+        通过书籍isbn获取spu_id
+        """
+        global create_recycle_order_cart_book_info
+        api = api_info[47]
+        api['api_headers']['Authorization'] = tokens['token']
+        for isbn in recycle_cart_isbn:
+            api['api_params']['scan_value'] = isbn
+            r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
+            assert r.status_code == 200
+            r_json = json.loads(r.text)
+            assert r_json['code'] == 0
+            create_recycle_order_cart_book_info[isbn] = {'spu_id': r_json['data']['items'][0]['spu_id'], 'name': r_json['data']['items'][0]['name'], 'original_price': r_json['data']['items'][0]['original_price']}
+        # print(recycle_cart_book_info)
+
+    @pytest.mark.run(order=3)
+    def test_add_book_to_recycle_cart(self):
+        """
+        添加书籍到回收车
+        """
+        global create_recycle_order_cart_num
+        api = api_info[48]
+        api['api_headers']['Authorization'] = tokens['token']
+        for isbn in recycle_cart_isbn:
+            api['api_body']['spu_id'] = create_recycle_order_cart_book_info[isbn]['spu_id']
+            r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
+            assert r.status_code == 200
+            r_json = json.loads(r.text)
+            assert r_json['code'] == 0
+            create_recycle_order_cart_num += 1
+
+    @pytest.mark.run(order=4)
+    def test_get_address_id(self):
+        """
+        获取用户收货地址
+        """
+        global old_address_id, old_address_detail
+        global new_address_id, new_address_detail
+        api = api_info[12]
+        api['api_headers']['Authorization'] = tokens['token']
+        r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
+        assert r.status_code == 200
+        r_json = json.loads(r.text)
+        assert r_json['code'] == 0
+        old_address = r_json['data']['list'][random.randint(0, r_json['data']['total']-1)]
+        old_address_id = old_address['id']
+        old_address_detail['sender_name'] = old_address['recipients']
+        old_address_detail['sender_tel'] = old_address['tel']
+        old_address_detail['address_town'] = old_address['town']
+        old_address_detail['address_detailed'] = old_address['detail']
+        new_address = r_json['data']['list'][random.randint(0, r_json['data']['total']-1)]
+        while new_address == old_address:
+            new_address = r_json['data']['list'][random.randint(0, r_json['data']['total']-1)]
+        new_address_id = new_address['id']
+        new_address_detail['sender_name'] = new_address['recipients']
+        new_address_detail['sender_tel'] = new_address['tel']
+        new_address_detail['address_town'] = new_address['town']
+        new_address_detail['address_detailed'] = new_address['detail']
+
+    @pytest.mark.run(order=5)
+    def test_get_pickup_time(self):
+        """
+        获取当前时间可选取件时间
+        """
+        global old_pickup_time
+        global new_pickup_time
+        api = api_info[45]
+        api['api_headers']['Authorization'] = tokens['token']
+        r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
+        assert r.status_code == 200
+        r_json = json.loads(r.text)
+        assert r_json['code'] == 0
+        old_num = random.randint(0, len(r_json['data'])-1)
+        new_num = random.randint(0, len(r_json['data'])-1)
+        while new_num == old_num:
+            new_num = random.randint(0, len(r_json['data'])-1)
+        # print(r_json['data'][old_num]['date'][:10])
+        # print(r_json['data'][new_num]['date'][:10])
+        # print(r_json['data'][old_num]['periods'][0])
+        # print(r_json['data'][new_num]['periods'][0])
+        old_pickup_time = {'date': r_json['data'][old_num]['date'][:10], 'period': r_json['data'][old_num]['periods'][0]}
+        new_pickup_time = {'date': r_json['data'][new_num]['date'][:10], 'period': r_json['data'][new_num]['periods'][0]}
+
+    @pytest.mark.run(order=6)
+    def test_create_recycle_order(self):
+        """
+        生成回收订单
+        """
+        global recycle_order_id
+        api = api_info[43]
+        api['api_headers']['Authorization'] = tokens['token']
+        api['api_body']['address_id'] = old_address_id
+        api['api_body']['pick_up_date'] = old_pickup_time['date']
+        api['api_body']['pick_up_period'] = old_pickup_time['period']
+        r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
+        assert r.status_code == 200
+        r_json = json.loads(r.text)
+        assert r_json['code'] == 0
+        recycle_order_id = r_json['data']['id']
+
+    @pytest.mark.run(order=7)
+    def test_recycle_order_detail_is_correct(self):
+        """
+        获取回收订单详情，看书籍信息是否匹配、订单状态是否为待确认0
+        """
+        api = api_info[42]
+        api['api_headers']['Authorization'] = tokens['token']
+        api['api_params']['id'] = recycle_order_id
+        r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
+        assert r.status_code == 200
+        r_json = json.loads(r.text)
+        assert r_json['code'] == 0
+        assert r_json['data']['order']['status'] == 0
+        assert r_json['data']['address']['address_town'] == old_address_detail['address_town']
+        assert r_json['data']['address']['address_detailed'] == old_address_detail['address_detailed']
+        assert r_json['data']['address']['sender_name'] == old_address_detail['sender_name']
+        assert r_json['data']['address']['sender_tel'] == old_address_detail['sender_tel']
+        assert r_json['data']['address']['pickup_start_time'] == str_to_timestamp(old_pickup_time['date'] + ' ' + old_pickup_time['period'].split('-')[0] + ':00')
+        assert r_json['data']['address']['pickup_end_time'] == str_to_timestamp(old_pickup_time['date'] + ' ' + old_pickup_time['period'].split('-')[-1] + ':00')
+
+    @pytest.mark.run(order=8)
+    def test_modify_address(self):
+        """
+        修改地址
+        """
+        api = api_info[50]
+        api['api_headers']['Authorization'] = tokens['token']
+        api['api_body']['recycle_order_id'] = recycle_order_id
+        api['api_body']['address_id'] = new_address_id
+        r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
+        assert r.status_code == 200
+        r_json = json.loads(r.text)
+        assert r_json['code'] == 0
+
+    @pytest.mark.run(order=9)
+    def test_modify_address_is_success(self):
+        """
+        获取回收订单详情，看地址是否发生改变
+        """
+        api = api_info[42]
+        api['api_headers']['Authorization'] = tokens['token']
+        api['api_params']['id'] = recycle_order_id
+        r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
+        assert r.status_code == 200
+        r_json = json.loads(r.text)
+        assert r_json['code'] == 0
+        assert r_json['data']['order']['status'] == 0
+        assert r_json['data']['address']['address_town'] == new_address_detail['address_town']
+        assert r_json['data']['address']['address_detailed'] == new_address_detail['address_detailed']
+        assert r_json['data']['address']['sender_name'] == new_address_detail['sender_name']
+        assert r_json['data']['address']['sender_tel'] == new_address_detail['sender_tel']
+        assert r_json['data']['address']['pickup_start_time'] == str_to_timestamp(old_pickup_time['date'] + ' ' + old_pickup_time['period'].split('-')[0] + ':00')
+        assert r_json['data']['address']['pickup_end_time'] == str_to_timestamp(old_pickup_time['date'] + ' ' + old_pickup_time['period'].split('-')[-1] + ':00')
+
+    @pytest.mark.run(order=10)
+    def test_modify_pickup_time(self):
+        """
+        修改取件时间
+        """
+        api = api_info[51]
+        api['api_headers']['Authorization'] = tokens['token']
+        api['api_body']['recycle_order_id'] = recycle_order_id
+        api['api_body']['pick_up_date'] = new_pickup_time['date']
+        api['api_body']['pick_up_period'] = new_pickup_time['period']
+        r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
+        assert r.status_code == 200
+        r_json = json.loads(r.text)
+        assert r_json['code'] == 0
+
+    @pytest.mark.run(order=11)
+    def test_modify_pickup_time_is_success(self):
+        """
+        获取回收订单详情，看取件时间是否发生改变
+        """
+        api = api_info[42]
+        api['api_headers']['Authorization'] = tokens['token']
+        api['api_params']['id'] = recycle_order_id
+        r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
+        assert r.status_code == 200
+        r_json = json.loads(r.text)
+        assert r_json['code'] == 0
+        assert r_json['data']['order']['status'] == 0
+        assert r_json['data']['address']['address_town'] == new_address_detail['address_town']
+        assert r_json['data']['address']['address_detailed'] == new_address_detail['address_detailed']
+        assert r_json['data']['address']['sender_name'] == new_address_detail['sender_name']
+        assert r_json['data']['address']['sender_tel'] == new_address_detail['sender_tel']
+        assert r_json['data']['address']['pickup_start_time'] == str_to_timestamp(new_pickup_time['date'] + ' ' + new_pickup_time['period'].split('-')[0] + ':00')
+        assert r_json['data']['address']['pickup_end_time'] == str_to_timestamp(new_pickup_time['date'] + ' ' + new_pickup_time['period'].split('-')[-1] + ':00')
+
+    @pytest.mark.run(order=12)
+    def test_cancel_recycle_order(self):
+        """
+        取消回收订单
+        """
+        api = api_info[44]
+        api['api_headers']['Authorization'] = tokens['token']
+        api['api_body']['id'] = recycle_order_id
+        r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
+        assert r.status_code == 200
+        r_json = json.loads(r.text)
+        assert r_json['code'] == 0
+
+    @pytest.mark.run(order=13)
+    def test_cancel_is_success(self):
+        """
+        获取回收订单详情，看订单状态是否发生改变（已取消回收订单状态为-1）
+        """
+        api = api_info[42]
+        api['api_headers']['Authorization'] = tokens['token']
+        api['api_params']['id'] = recycle_order_id
+        r = send_requests(api['api_method'], main_url + api['api_url'], api['api_params'], api['api_body'], api['api_headers'], verify=False)
+        assert r.status_code == 200
+        r_json = json.loads(r.text)
+        assert r_json['code'] == 0
+        assert r_json['data']['order']['status'] == -1
